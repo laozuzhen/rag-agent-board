@@ -1,6 +1,6 @@
 ﻿// RAG Agent Board - Dashboard App (zh-CN)
 (function () {
-  const API = "/agent-board/api";
+  const API = "/api";
   const COLUMNS = ["backlog", "todo", "doing", "review", "done", "failed"];
   const COL_LABELS = {
     backlog: "积压",

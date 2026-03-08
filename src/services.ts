@@ -1,6 +1,7 @@
 import * as store from "./store.js";
 import { generateId, now } from "./utils.js";
 import { Task, TaskColumn } from "./types.js";
+import { notifyAgent, notifyAgentRetrigger } from "./runtime.js";
 
 export interface MoveResult {
   task: Task;
@@ -83,11 +84,33 @@ export async function moveTask(taskId: string, column: TaskColumn): Promise<Move
         text: `Auto-retry ${retryCount + 1}/${maxRetries}: task moved back to todo after failure.`,
       });
       retried = true;
+      
+      // 🔔 直接重新触发 assignee 执行任务
+      notifyAgentRetrigger(updated.assignee, {
+        taskId: updated.id,
+        taskTitle: updated.title,
+        retryCount: retryCount + 1,
+        maxRetries,
+      }).catch(err => 
+        console.error('[agent-board] notifyAgentRetrigger error:', err)
+      );
     } else {
       await store.addComment(updated.id, {
         author: "system",
         text: `Max retries (${maxRetries}) exhausted. Task requires manual intervention.`,
       });
+      
+      // 🔔 通知 main agent（管理员）需要人工干预
+      notifyAgent("main", 
+        `⚠️ 任务需要人工干预\n\n` +
+        `**任务**: ${updated.title}\n` +
+        `**ID**: ${updated.id}\n` +
+        `**Assignee**: ${updated.assignee}\n` +
+        `**重试次数**: ${maxRetries}/${maxRetries} 已用尽\n\n` +
+        `请在 agent-board 中查看并处理。`
+      ).catch(err => 
+        console.error('[agent-board] notifyAgent (main) error:', err)
+      );
     }
   }
 
@@ -100,6 +123,23 @@ export async function moveTask(taskId: string, column: TaskColumn): Promise<Move
           author: "system",
           text: `Dependency resolved: "${updated.title}" (${updated.id}) is now done.`,
         });
+        
+        // 🔔 通知依赖者的 assignee 依赖已解决
+        const allDepsDone = t.dependencies.every(depId => {
+          const dep = store.getTask(depId);
+          return dep && dep.column === "done";
+        });
+        
+        if (allDepsDone) {
+          notifyAgent(t.assignee,
+            `✅ 任务依赖已解决，可以开始执行\n\n` +
+            `**任务**: ${t.title}\n` +
+            `**ID**: ${t.id}\n\n` +
+            `所有前置依赖已完成。`
+          ).catch(err => 
+            console.error('[agent-board] notifyDependenciesResolved error:', err)
+          );
+        }
       }
     }
   }
@@ -131,8 +171,20 @@ export async function moveTask(taskId: string, column: TaskColumn): Promise<Move
       updatedAt: now(),
     };
     spawned = await store.createTask(chainedTask);
+    
+    // 🔔 通知新任务的 assignee
+    if (spawned) {
+      notifyAgent(spawned.assignee,
+        `🔗 新任务已自动创建\n\n` +
+        `**任务**: ${spawned.title}\n` +
+        `**ID**: ${spawned.id}\n` +
+        `**来源**: ${updated.title}\n\n` +
+        `这是前置任务完成后自动创建的后续任务。`
+      ).catch(err => 
+        console.error('[agent-board] notifyChainedTaskCreated error:', err)
+      );
+    }
   }
 
   return { task: updated, retried, ...(spawned ? { chainedTask: spawned } : {}) };
 }
-

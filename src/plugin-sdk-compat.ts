@@ -6,17 +6,43 @@ type StringEnumOptions<T extends readonly string[]> = {
   default?: T[number];
 };
 
+// Runtime types for plugin
+export type PluginRuntime = {
+  subagent: {
+    run: (params: {
+      sessionKey: string;
+      message: string;
+      deliver?: boolean;
+    }) => Promise<{ runId: string }>;
+    waitForRun: (params: {
+      runId: string;
+      timeoutMs?: number;
+    }) => Promise<{ status: string; error?: string }>;
+    getSessionMessages: (params: {
+      sessionKey: string;
+      limit?: number;
+    }) => Promise<{ messages: unknown[] }>;
+  };
+};
+
 export type AgentBoardPluginApi = {
   pluginConfig?: unknown;
   resolvePath: (input: string) => string;
+  runtime: PluginRuntime;
   registerTool: (
     factory: (ctx: AgentBoardPluginToolContext) => unknown,
     options: { names: readonly string[] },
   ) => void;
   registerHttpHandler: (handler: unknown) => void;
+  registerHttpRoute: (options: {
+    path: string;
+    handler: unknown;
+    auth?: string;
+  }) => void;
   registerService: (service: {
     id: string;
-    start: (ctx: { logger: { info: (message: string) => void } }) => void;
+    start: (ctx: { logger: { info: (message: string) => void; error?: (message: string) => void } }) => void;
+    stop?: (ctx: { logger: { info: (message: string) => void } }) => void;
   }) => void;
 };
 
