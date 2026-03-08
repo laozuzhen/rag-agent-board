@@ -44,8 +44,8 @@ const templatesDir = fileURLToPath(new URL("./templates", import.meta.url));
 
 const plugin = {
   id: "agent-board",
-  name: "Agent Board",
-  description: "Embedded board with native tools and a gateway-hosted dashboard.",
+  name: "RAG Agent Board",
+  description: "Embedded RAG-oriented board with native tools and a gateway-hosted dashboard.",
   register(api: MoltbotPluginApi) {
     const config = resolveConfig(api.pluginConfig);
     const dataDir = api.resolvePath(config.dataDir);

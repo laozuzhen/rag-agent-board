@@ -1,7 +1,7 @@
 {
   "id": "agent-board",
-  "name": "Agent Board",
-  "description": "Embedded Kanban board with native tools and gateway-hosted dashboard.",
+  "name": "RAG Agent Board",
+  "description": "Embedded RAG-oriented Kanban board with native tools and gateway-hosted dashboard.",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

@@ -1,8 +1,27 @@
 {
-  "name": "@moltbot/agent-board",
+  "name": "rag-agent-board",
   "version": "2026.1.27-beta.1",
+  "description": "Embedded OpenClaw/Moltbot board plugin for agent and RAG-oriented workflow management.",
   "type": "module",
-  "description": "Moltbot Agent Board plugin",
+  "license": "MIT",
+  "keywords": [
+    "openclaw",
+    "moltbot",
+    "rag",
+    "agent",
+    "dashboard",
+    "kanban",
+    "plugin",
+    "typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/laozuzhen/rag-agent-board.git"
+  },
+  "homepage": "https://github.com/laozuzhen/rag-agent-board",
+  "bugs": {
+    "url": "https://github.com/laozuzhen/rag-agent-board/issues"
+  },
   "dependencies": {
     "@sinclair/typebox": "0.34.47",
     "express": "^5.2.1",

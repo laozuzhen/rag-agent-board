@@ -1,4 +1,4 @@
-﻿// Agent Board - Dashboard App (zh-CN)
+﻿// RAG Agent Board - Dashboard App (zh-CN)
 (function () {
   const API = "/agent-board/api";
   const COLUMNS = ["backlog", "todo", "doing", "review", "done", "failed"];
