@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { MoltbotPluginApi } from "clawdbot/plugin-sdk";
+import type { AgentBoardPluginApi } from "./src/plugin-sdk-compat.js";
 
 import { setAuditDataDir } from "./src/audit.js";
 import { createAgentBoardApp } from "./src/app.js";
@@ -46,7 +46,7 @@ const plugin = {
   id: "agent-board",
   name: "RAG Agent Board",
   description: "Embedded RAG-oriented board with native tools and a gateway-hosted dashboard.",
-  register(api: MoltbotPluginApi) {
+  register(api: AgentBoardPluginApi) {
     const config = resolveConfig(api.pluginConfig);
     const dataDir = api.resolvePath(config.dataDir);
     const openClawDir = api.resolvePath(config.openClawDir);

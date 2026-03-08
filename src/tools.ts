@@ -1,6 +1,6 @@
 import { Type } from "@sinclair/typebox";
-import type { MoltbotPluginApi, MoltbotPluginToolContext } from "clawdbot/plugin-sdk";
-import { jsonResult, optionalStringEnum, stringEnum } from "clawdbot/plugin-sdk";
+import type { AgentBoardPluginApi, AgentBoardPluginToolContext } from "./plugin-sdk-compat.js";
+import { jsonResult, optionalStringEnum, stringEnum } from "./plugin-sdk-compat.js";
 
 import { appendAuditLog } from "./audit.js";
 import { moveTask } from "./services.js";
@@ -36,13 +36,13 @@ const NextTaskSchema = Type.Object(
   { additionalProperties: false },
 );
 
-function actorFromContext(ctx: MoltbotPluginToolContext): string {
+function actorFromContext(ctx: AgentBoardPluginToolContext): string {
   return ctx.agentId || ctx.sessionKey || ctx.agentAccountId || ctx.messageChannel || "plugin";
 }
 
 type ToolAuditEntry = Omit<Parameters<typeof appendAuditLog>[0], "agentId"> & { agentId?: string };
 
-function audit(ctx: MoltbotPluginToolContext, payload: ToolAuditEntry) {
+function audit(ctx: AgentBoardPluginToolContext, payload: ToolAuditEntry) {
   appendAuditLog({ ...payload, agentId: payload.agentId || actorFromContext(ctx) });
 }
 
@@ -164,7 +164,7 @@ type DeleteByIdParams = {
   id: string;
 };
 
-export function createAgentBoardTools(_api: MoltbotPluginApi, ctx: MoltbotPluginToolContext) {
+export function createAgentBoardTools(_api: AgentBoardPluginApi, ctx: AgentBoardPluginToolContext) {
   return [
     {
       name: "board_list_projects",
