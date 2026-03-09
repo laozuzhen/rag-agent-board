@@ -1,14 +1,14 @@
-import { Router, Request, Response, NextFunction } from "express";
+﻿import { Router, Request, Response, NextFunction } from "express";
 import { existsSync, readFileSync, readdirSync } from "fs";
 import os from "os";
 import pathLib from "path";
-import { createHmac } from "crypto";
 import { z } from "zod";
 import * as store from "./store.js";
 import { generateId, now } from "./utils.js";
 import { Task, TaskColumn, TaskPriority, NextTask, AgentStats, BoardStats, Agent } from "./types.js";
 import { moveTask } from "./services.js";
 import { appendAuditLog, readAuditLog } from "./audit.js";
+import { notifyAgent } from "./notify.js";
 import {
   CreateTaskSchema,
   UpdateTaskSchema,
@@ -266,140 +266,6 @@ function loadTemplateFromDir(name: string): any[] | null {
     return Array.isArray(data) ? data : null;
   } catch {
     return null;
-  }
-}
-
-// --- OpenClaw Webhook Integration ---
-
-const OPENCLAW_HOOK_URL = process.env.OPENCLAW_HOOK_URL || "http://localhost:18789/hooks/agent";
-const OPENCLAW_HOOK_TOKEN = process.env.OPENCLAW_HOOK_TOKEN || "";
-
-function getHookToken(): string {
-  return process.env.OPENCLAW_HOOK_TOKEN || OPENCLAW_HOOK_TOKEN;
-}
-
-// --- HMAC Signing ---
-
-function getWebhookSecret(): string {
-  return process.env.AGENTBOARD_WEBHOOK_SECRET || getHookToken();
-}
-
-export function signPayload(body: Record<string, unknown>, secret: string): { signature: string; timestamp: number } {
-  const timestamp = Date.now();
-  const bodyWithTimestamp = { ...body, timestamp };
-  const raw = JSON.stringify(bodyWithTimestamp);
-  const hmac = createHmac("sha256", secret).update(raw).digest("hex");
-  return { signature: `sha256=${hmac}`, timestamp };
-}
-
-// Agent ID -> OpenClaw agent session key mapping
-const AGENT_SESSION_MAP: Record<string, string> = {
-  "jarvx": "agent:main:main",
-  "eff": "agent:eff:main",
-  "agency": "agent:agency:main",
-  "auteur-augmente": "agent:auteur-augmente:main",
-  "content-creator": "agent:content:main",
-  "sales-agent": "agent:sales:main",
-  "research-agent": "agent:research:main",
-  "coding-agent": "agent:coding:main",
-  "support": "agent:support:main",
-  "onboarding": "agent:onboarding:main",
-  "community": "agent:community:main",
-  "ops": "agent:ops:main",
-  "infra-agent": "agent:infra:main",
-};
-
-// Map board assignee names to gateway agent IDs
-function resolveAgentId(assignee: string): string {
-  const sessionKey = AGENT_SESSION_MAP[assignee];
-  if (sessionKey) {
-    // Extract agent ID from "agent:{id}:main" format
-    const parts = sessionKey.split(":");
-    return parts.length >= 2 ? parts[1] : assignee;
-  }
-  return assignee;
-}
-
-async function notifyAgent(task: Task, context?: string, event?: string): Promise<boolean> {
-  const hookToken = getHookToken();
-  if (!hookToken) return false;
-  const agentName = task.assignee;
-  if (!agentName) return false;
-
-  const message = [
-    `[AgentBoard] Task: ${task.title} (${task.id})`,
-    context ? `Contexte: ${context}` : "",
-    task.description ? `Brief: ${task.description.slice(0, 300)}` : "",
-    ``,
-    `Check ton board et traite cette task.`,
-  ].filter(Boolean).join("\n");
-
-  try {
-    const resolvedAgent = resolveAgentId(agentName);
-    const basePayload: Record<string, unknown> = {
-      agent: resolvedAgent,
-      message,
-      wakeMode: "now",
-      source: "agentboard",
-      taskId: task.id,
-      event: event || undefined,
-    };
-
-    const secret = getWebhookSecret();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${hookToken}`,
-    };
-
-    let finalPayload: Record<string, unknown>;
-
-    if (secret) {
-      const { signature, timestamp } = signPayload(basePayload, secret);
-      finalPayload = { ...basePayload, timestamp, signature };
-      headers["X-AgentBoard-Signature"] = signature;
-      headers["X-AgentBoard-Timestamp"] = String(timestamp);
-      headers["X-AgentBoard-Source"] = "agentboard";
-    } else {
-      finalPayload = basePayload;
-    }
-
-    const res = await fetch(OPENCLAW_HOOK_URL, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(finalPayload),
-    });
-    return res.ok;
-  } catch (e) {
-    console.error(`[webhook] Failed to notify ${agentName}:`, e);
-    return false;
-  }
-}
-
-async function sendTaskUpdateWebhook(task: Task): Promise<boolean> {
-  const webhookUrl = process.env.OPENCLAW_HOOK_URL || "http://localhost:18789/hooks";
-  const webhookToken = process.env.OPENCLAW_HOOK_TOKEN || "";
-
-  const payload = {
-    event: "task.updated",
-    taskId: task.id,
-    status: task.status,
-    assignedTo: task.assignee,
-    title: task.title,
-  };
-
-  try {
-    const res = await fetch(webhookUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${webhookToken}`,
-      },
-      body: JSON.stringify(payload),
-    });
-    return res.ok;
-  } catch (e) {
-    console.error(`[webhook] Failed to send task update webhook:`, e);
-    return false;
   }
 }
 
@@ -971,7 +837,7 @@ router.get("/agents", (_req: Request, res: Response) => {
 router.post("/agents", validate(RegisterAgentSchema), async (req: Request, res: Response) => {
   const { id, name, role, capabilities } = req.body;
 
-  // Check for existing agent �?no upsert allowed
+  // Check for existing agent 鈥?no upsert allowed
   const existing = store.getAgents().find(a => a.id === id);
   if (existing) {
     return res.status(409).json({ error: `Agent "${id}" already exists` });

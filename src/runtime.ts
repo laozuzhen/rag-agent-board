@@ -1,12 +1,30 @@
-/**
- * Agent Board - Runtime 存储
- * 
- * 存储插件 runtime 引用，用于发送通知
- */
+﻿import type { PluginRuntime } from "./plugin-sdk-compat.js";
 
-import type { PluginRuntime } from "./plugin-sdk-compat.js";
+const AGENT_SESSION_MAP: Record<string, string> = {
+  jarvx: "agent:main:main",
+  eff: "agent:eff:main",
+  agency: "agent:agency:main",
+  "auteur-augmente": "agent:auteur-augmente:main",
+  "content-creator": "agent:content:main",
+  "sales-agent": "agent:sales:main",
+  "research-agent": "agent:research:main",
+  "coding-agent": "agent:coding:main",
+  support: "agent:support:main",
+  onboarding: "agent:onboarding:main",
+  community: "agent:community:main",
+  ops: "agent:ops:main",
+  "infra-agent": "agent:infra:main",
+};
 
 let _runtime: PluginRuntime | null = null;
+
+function parseAgentIdFromSessionKey(sessionKey: string): string | null {
+  const parts = sessionKey.split(":");
+  if (parts.length >= 3 && parts[0] === "agent" && parts[1]) {
+    return parts[1];
+  }
+  return null;
+}
 
 export function setRuntime(runtime: PluginRuntime): void {
   _runtime = runtime;
@@ -16,23 +34,36 @@ export function getRuntime(): PluginRuntime | null {
   return _runtime;
 }
 
-/**
- * 发送消息给指定的 agent session
- */
-export async function notifyAgent(agentId: string | undefined, message: string): Promise<boolean> {
-  if (!agentId) {
-    console.warn('[agent-board] notifyAgent: no agentId provided');
+export function resolveBoardAssigneeSessionKey(assignee: string | undefined): string {
+  const trimmed = typeof assignee === "string" ? assignee.trim() : "";
+  if (!trimmed) return "";
+  if (/^(agent|subagent|acp):/i.test(trimmed)) return trimmed;
+  return AGENT_SESSION_MAP[trimmed] || `agent:${trimmed}:main`;
+}
+
+export function resolveBoardAssigneeAgentId(assignee: string | undefined): string {
+  const sessionKey = resolveBoardAssigneeSessionKey(assignee);
+  const agentId = parseAgentIdFromSessionKey(sessionKey);
+  const trimmed = typeof assignee === "string" ? assignee.trim() : "";
+  return agentId || trimmed;
+}
+
+export async function notifyAgent(assignee: string | undefined, message: string): Promise<boolean> {
+  if (!assignee) {
+    console.warn("[agent-board] notifyAgent: no assignee provided");
     return false;
   }
 
   if (!_runtime) {
-    console.warn('[agent-board] notifyAgent: runtime not set');
+    console.warn("[agent-board] notifyAgent: runtime not set");
     return false;
   }
 
-  const sessionKey = `agent:${agentId}:main`;
-
-  console.log(`[agent-board] 📤 Notifying agent: ${agentId}`);
+  const sessionKey = resolveBoardAssigneeSessionKey(assignee);
+  if (!sessionKey) {
+    console.warn("[agent-board] notifyAgent: could not resolve session key");
+    return false;
+  }
 
   try {
     const result = await _runtime.subagent.run({
@@ -41,50 +72,51 @@ export async function notifyAgent(agentId: string | undefined, message: string):
       deliver: false,
     });
 
-    console.log(`[agent-board] ✅ Notification sent to ${agentId}, runId: ${result.runId}`);
+    const agentId = parseAgentIdFromSessionKey(sessionKey) || assignee;
+    console.log(`[agent-board] notification sent to ${agentId}, runId: ${result.runId}`);
     return true;
   } catch (error) {
-    console.error('[agent-board] notifyAgent error:', error);
+    console.error("[agent-board] notifyAgent error:", error);
     return false;
   }
 }
 
-/**
- * 重新触发 agent 执行任务（用于自动重试）
- */
 export async function notifyAgentRetrigger(
-  agentId: string | undefined, 
-  taskInfo: { taskId: string; taskTitle: string; retryCount: number; maxRetries: number }
+  assignee: string | undefined,
+  taskInfo: { taskId: string; taskTitle: string; retryCount: number; maxRetries: number },
 ): Promise<boolean> {
-  if (!agentId) {
-    console.warn('[agent-board] notifyAgentRetrigger: no agentId provided');
+  if (!assignee) {
+    console.warn("[agent-board] notifyAgentRetrigger: no assignee provided");
     return false;
   }
 
   if (!_runtime) {
-    console.warn('[agent-board] notifyAgentRetrigger: runtime not set');
+    console.warn("[agent-board] notifyAgentRetrigger: runtime not set");
     return false;
   }
 
-  const sessionKey = `agent:${agentId}:main`;
-
-  console.log(`[agent-board] 🔄 Retriggering agent: ${agentId} for task: ${taskInfo.taskTitle}`);
+  const sessionKey = resolveBoardAssigneeSessionKey(assignee);
+  if (!sessionKey) {
+    console.warn("[agent-board] notifyAgentRetrigger: could not resolve session key");
+    return false;
+  }
 
   try {
     const result = await _runtime.subagent.run({
       sessionKey,
-      message: 
-        `🔄 任务自动重试 #${taskInfo.retryCount}/${taskInfo.maxRetries}\n\n` +
-        `**任务ID**: ${taskInfo.taskId}\n` +
-        `**任务**: ${taskInfo.taskTitle}\n\n` +
-        `请继续执行这个任务。`,
+      message:
+        `Task auto-retry #${taskInfo.retryCount}/${taskInfo.maxRetries}\n\n` +
+        `Task ID: ${taskInfo.taskId}\n` +
+        `Task: ${taskInfo.taskTitle}\n\n` +
+        "Please continue working on this task.",
       deliver: false,
     });
 
-    console.log(`[agent-board] ✅ Retriggered ${agentId}, runId: ${result.runId}`);
+    const agentId = parseAgentIdFromSessionKey(sessionKey) || assignee;
+    console.log(`[agent-board] retriggered ${agentId}, runId: ${result.runId}`);
     return true;
   } catch (error) {
-    console.error('[agent-board] notifyAgentRetrigger error:', error);
+    console.error("[agent-board] notifyAgentRetrigger error:", error);
     return false;
   }
 }
