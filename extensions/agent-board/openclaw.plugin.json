@@ -1,0 +1,23 @@
+{
+  "id": "agent-board",
+  "name": "RAG Agent Board",
+  "description": "Embedded RAG-oriented Kanban board with native tools and gateway-hosted dashboard.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "dataDir": {
+        "type": "string",
+        "description": "Directory used to store board JSON data and audit logs."
+      },
+      "openClawDir": {
+        "type": "string",
+        "description": "OpenClaw home directory used for agent auto-discovery."
+      },
+      "autoDiscoverOpenClaw": {
+        "type": "boolean",
+        "description": "Auto-merge OpenClaw agents into the board agent list."
+      }
+    }
+  }
+}
